@@ -2,10 +2,12 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 
-using PayLoad = System.Collections.Generic.Dictionary<string, string>;
+using Content = System.Collections.Generic.Dictionary<string, string>;
 
 const string CONFIG_FILE = ".config";
 const string DEFAULT_BASKET = "save";
+const string DEFAULT_KEY = "note_";
+const string KEY_PARAMETER = "-n";
 string pantry_id = "";
 
 if (File.Exists(CONFIG_FILE))
@@ -36,23 +38,22 @@ if (respons.StatusCode == System.Net.HttpStatusCode.OK)
 
     if (pantry != null)
     {
-        Console.WriteLine($"Pantry: {pantry.name}");
         BasketListing? saveBasket = null;
+        if(pantry?.baskets != null){
         foreach (BasketListing basket in pantry.baskets)
         {
-            Console.WriteLine($"- {basket.name}");
             if (basket.name == DEFAULT_BASKET)
             {
                 saveBasket = basket;
             }
         }
+        }
 
         if (saveBasket == null)
         {
-            respons = await httpClient.PostAsJsonAsync(basketURL, new PayLoad() { });
+            respons = await httpClient.PostAsJsonAsync(basketURL, new Content() { });
             Console.WriteLine(await respons.Content.ReadAsStringAsync());
         }
-
     }
     else
     {
@@ -63,6 +64,61 @@ else
 {
     Console.WriteLine(respons.StatusCode);
     Console.WriteLine(await respons.Content.ReadAsStringAsync());
+}
+
+
+respons = await httpClient.GetAsync(basketURL);
+Content? allNotes = JsonSerializer.Deserialize<Content>(await respons.Content.ReadAsStringAsync());
+
+if (args.Length > 0)
+{
+    string key = "";
+    int startIndex = 0;
+
+    for (int i = 0; i < args.Length; i++)
+    {
+        if (args[i] == KEY_PARAMETER)
+        {
+            key = args[i + 1];
+            startIndex = i + 2;
+            break;
+        }
+    }
+
+    string content = String.Join(" ", args[startIndex..args.Length]);
+
+    if (key == "")
+    {
+        int index = 0;
+        do
+        {
+            key = $"{DEFAULT_KEY}{index}";
+            index++;
+        } while (allNotes != null && allNotes.ContainsKey(key));
+    }
+
+
+    respons = await httpClient.PutAsJsonAsync(basketURL, new Content() { { key, content } });
+    if (respons.StatusCode == System.Net.HttpStatusCode.OK)
+    {
+        Console.WriteLine("Saved");
+    }
+    else
+    {
+        Console.WriteLine(await respons.Content.ReadAsStringAsync());
+    }
+
+} else {
+
+    if(allNotes != null){
+        foreach (var pair in allNotes)
+        {
+            Console.WriteLine(pair.Key);
+            Console.WriteLine(pair.Value);
+            Console.WriteLine("");
+        }
+    }
+
 }
 
 
